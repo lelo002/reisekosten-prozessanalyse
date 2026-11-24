@@ -16,7 +16,7 @@ create table event_log (
 alter table cases enable row level security;
 alter table event_log enable row level security;
 
--- A: Wie läuft der Prozess ab?
+-- A.1: Wie läuft der Prozess ab?
 with v as (
   select case_id, string_agg(activity, ' > ' order by event_nr) as variante
   from event_log group by case_id
@@ -24,6 +24,38 @@ with v as (
 select variante, count(*) as anzahl,
        round(100.0 * count(*) / 10500, 1) as prozent
 from v group by variante order by anzahl desc limit 5;
+
+-- A.2: Wie läuft der Prozess ab? (genutzt)
+
+with v as (
+  select case_id,
+         array_agg(
+           case activity
+             when 'Declaration SUBMITTED by EMPLOYEE'        then 'Einreichung'
+             when 'Declaration APPROVED by ADMINISTRATION'   then 'Verwaltung'
+             when 'Declaration APPROVED by BUDGET OWNER'     then 'Budget'
+             when 'Declaration FINAL_APPROVED by SUPERVISOR' then 'Vorgesetzte'
+             when 'Request Payment'                          then 'Anforderung'
+             when 'Payment Handled'                          then 'Zahlung'
+             else activity
+           end
+           order by event_nr
+         ) as ablauf
+  from event_log
+  group by case_id
+)
+select ablauf[1] as s1,
+       ablauf[2] as s2,
+       ablauf[3] as s3,
+       ablauf[4] as s4,
+       ablauf[5] as s5,
+       ablauf[6] as s6,
+       count(*) as anzahl,
+       round(100.0 * count(*) / 10500, 1) as prozent
+from v
+group by ablauf
+order by anzahl desc
+limit 3;
 
 -- B: Wo wird gewartet?
 with s as (
